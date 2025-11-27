@@ -69,7 +69,8 @@ export const DEFAULTS = {
   claudeApiKey: '',
   mistralApiKey: '',
   deepseekApiKey: '',
-  customTags: DEFAULT_CUSTOM_TAGS
+  customTags: DEFAULT_CUSTOM_TAGS,
+  enableNewMailProcessing: false
 };
 
 export const PROMPT_BASE = [

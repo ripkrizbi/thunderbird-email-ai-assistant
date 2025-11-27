@@ -18,6 +18,14 @@
     <div id="general-settings" class="tab-content active">
       <form id="general-options-form">
         <div class="form-group">
+          <label for="enable-new-mail-processing">
+            <input type="checkbox" id="enable-new-mail-processing" name="enable-new-mail-processing">
+            Process incoming mail automatically
+          </label>
+          <p class="help-text">When enabled, the extension will automatically analyze and tag new incoming emails. When disabled, only manual folder processing via context menu will work.</p>
+        </div>
+        <hr>
+        <div class="form-group">
           <label for="provider">LLM Provider:</label>
           <select id="provider" name="provider">
             <option value="ollama">Ollama</option>

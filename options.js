@@ -4,6 +4,7 @@ import {ensureTagsExist} from "./core/tags";
 document.addEventListener('DOMContentLoaded', async () => {
   // --- General Settings Elements ---
   const providerSelect = document.getElementById('provider');
+  const enableNewMailProcessing = document.getElementById('enable-new-mail-processing');
   const generalForm = document.getElementById('general-options-form');
   const generalStatusMessage = document.getElementById('general-status-message');
   const statusMessage = document.getElementById('general-status-message');
@@ -40,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadGeneralSettings() {
     const settings = await messenger.storage.local.get(DEFAULTS);
 
+    enableNewMailProcessing.checked = settings.enableNewMailProcessing;
     providerSelect.value = settings.provider;
     if(document.getElementById('ollama-api-url'))
       document.getElementById('ollama-api-url').value = settings.ollamaApiUrl;
@@ -62,7 +64,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
 
     const provider = providerSelect.value;
-    const settingsToSave = { provider };
+    const settingsToSave = { 
+      provider,
+      enableNewMailProcessing: enableNewMailProcessing.checked
+    };
     let permissionGranted = true;
     let permissionOrigin = '';
 
