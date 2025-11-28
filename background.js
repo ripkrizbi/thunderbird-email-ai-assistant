@@ -2,39 +2,64 @@ import {DEFAULTS, HARDCODED_TAGS, TAG_KEY_PREFIX, TAG_NAME_PREFIX} from './core/
 import { findEmailParts } from './core/analysis.js';
 import { PROVIDER_ENGINES } from './providers';
 import {ensureTagsExist} from "./core/tags";
+import { setDebug, log, info, warn, error } from './core/debug.js';
 
-console.log("Spam-Filter Extension: Background script loaded.");
+// Initialization: read debug setting and run startup tasks
+(async () => {
+  try {
+    const settings = await messenger.storage.local.get(DEFAULTS);
+    setDebug(settings.debugMode);
+    log("Spam-Filter Extension: Background script loaded.");
+    // Ensure tags exist on startup
+    await ensureTagsExist();
+  } catch (e) {
+    error("Error during background init:", e);
+  }
+})();
 
 async function analyzeEmail(structuredData) {
   const settings = await messenger.storage.local.get(DEFAULTS);
+  log("Spam-Filter Extension: analyzeEmail called");
+  log("Provider:", settings.provider);
+  
   const engine = PROVIDER_ENGINES[settings.provider];
 
   if (engine) {
     // Pass both general settings and custom tags to the engine
-    console.log(`Using ${settings.provider}`);
-    return await engine(settings, structuredData, settings.customTags);
+    log(`Using ${settings.provider} engine`);
+    log("Calling analysis engine...");
+    const result = await engine(settings, structuredData, settings.customTags);
+    log("Analysis engine returned:", result);
+    return result;
   } else {
-    console.error(`No analysis engine found for provider: ${settings.provider}`);
+    error(`No analysis engine found for provider: ${settings.provider}`);
     return null;
   }
 }
 
 async function processMessage(message) {
   try {
+    log("Spam-Filter Extension: Processing message ID:", message.id);
+    
     // Check if message has already been processed by checking for our tagged marker
     const messageDetails = await messenger.messages.get(message.id);
+    log("Message details:", messageDetails);
+    log("Message tags:", messageDetails.tags);
+    
     const hasBeenProcessed = messageDetails.tags && messageDetails.tags.some(tag => 
       tag === (TAG_KEY_PREFIX + HARDCODED_TAGS.tagged.key) || 
       tag === HARDCODED_TAGS.tagged.key
     );
     
     if (hasBeenProcessed) {
-      console.log("Message already processed, skipping ID:", message.id);
+        log("Message already processed, skipping ID:", message.id);
       return 'skipped';
     }
 
     const fullMessage = await messenger.messages.getFull(message.id);
+    log("Full message retrieved, parsing parts...");
     const { body, attachments } = findEmailParts(fullMessage.parts);
+    log("Email parts found - Body length:", body.length, "Attachments:", attachments.length);
     
     const structuredData = {
         headers: fullMessage.headers,
@@ -42,15 +67,19 @@ async function processMessage(message) {
         attachments: attachments
     };
 
+    log("Analyzing email...");
     const analysis = await analyzeEmail(structuredData);
+    log("Analysis result:", analysis);
     
     if (!analysis) {
-      console.log("Skipping tagging due to analysis failure for ID:", message.id);
+        log("Skipping tagging due to analysis failure for ID:", message.id);
       return false;
     }
 
     const { customTags } = await messenger.storage.local.get({ customTags: DEFAULTS.customTags });
     const tagSet = new Set(messageDetails.tags || []);
+    
+    log("Current tags before processing:", Array.from(tagSet));
     
     // Handle hardcoded tags
     if (analysis.is_scam || analysis.spf_pass === false || analysis.dkim_pass === false) tagSet.add(HARDCODED_TAGS.is_scam.key);
@@ -64,25 +93,29 @@ async function processMessage(message) {
       }
     }
     tagSet.add(TAG_KEY_PREFIX + HARDCODED_TAGS.tagged.key);
-    console.log("Spam-Filter Extension: Analysis complete, tagging...", tagSet);
+    log("Spam-Filter Extension: Analysis complete, new tags to apply:", Array.from(tagSet));
 
-    await messenger.messages.update(message.id, { tags: Array.from(tagSet) });
+    const tagsArray = Array.from(tagSet);
+    log("Updating message with tags:", tagsArray);
+    await messenger.messages.update(message.id, { tags: tagsArray });
+    log("Message updated successfully");
     return true;
   } catch (error) {
-    console.error("Error processing message ID:", message.id, error);
+    error("Error processing message ID:", message.id, error);
+    error("Error stack:", error.stack);
     return false;
   }
 }
 
-console.log("Spam-Filter Extension: Setting up onNewMailReceived handler");
+log("Spam-Filter Extension: Setting up onNewMailReceived handler");
 
 messenger.messages.onNewMailReceived.addListener(async (folder, messages) => {
-  console.log("Spam-Filter Extension: New messages, yey!");
+  log("Spam-Filter Extension: New messages, yey!");
 
   // Check if new mail processing is enabled
   const settings = await messenger.storage.local.get(DEFAULTS);
   if (!settings.enableNewMailProcessing) {
-    console.log("Spam-Filter Extension: New mail processing is disabled. Skipping.");
+    log("Spam-Filter Extension: New mail processing is disabled. Skipping.");
     return;
   }
 
@@ -99,19 +132,26 @@ async function processFolderRetroactively(folder) {
     // folder is already the folder object from the context menu or message
     const folderName = folder.name || 'Unknown Folder';
     console.log("Processing folder:", folderName);
+    console.log("Folder object:", JSON.stringify(folder, null, 2));
     
     // Get all messages in the folder
+    log("Fetching messages from folder...");
     const page = await messenger.messages.list(folder);
+    log("First page results:", page.messages.length, "messages, page ID:", page.id);
     const allMessages = [...page.messages];
     
     // If there are more messages, we need to handle pagination
     let currentPage = page;
+    let pageCount = 1;
     while (currentPage.id) {
+      log("Fetching next page...");
       currentPage = await messenger.messages.continueList(currentPage.id);
+      log("Page", pageCount + 1, "results:", currentPage.messages.length, "messages");
       allMessages.push(...currentPage.messages);
+      pageCount++;
     }
     
-    console.log(`Found ${allMessages.length} messages to process`);
+    log(`Total messages found: ${allMessages.length}`);
     
     let processedCount = 0;
     let successCount = 0;
@@ -137,7 +177,7 @@ async function processFolderRetroactively(folder) {
       // Send progress update every 10 messages
       if (processedCount % 10 === 0 || processedCount === allMessages.length) {
         const progressMsg = `Processing: ${processedCount}/${allMessages.length} messages (${skippedCount} already processed)`;
-        console.log(progressMsg);
+        log(progressMsg);
         await messenger.notifications.create('processing-progress', {
           type: 'basic',
           title: 'Email AI Assistant',
@@ -148,7 +188,7 @@ async function processFolderRetroactively(folder) {
     
     // Show completion notification
     const completionMsg = `Completed! Processed ${successCount}/${allMessages.length} messages (${skippedCount} already processed) in "${folderName}"`;
-    console.log(completionMsg);
+    log(completionMsg);
     await messenger.notifications.create('processing-complete', {
       type: 'basic',
       title: 'Email AI Assistant',
@@ -156,7 +196,7 @@ async function processFolderRetroactively(folder) {
     });
     
   } catch (error) {
-    console.error("Error processing folder:", error);
+    error("Error processing folder:", error);
     await messenger.notifications.create('processing-error', {
       type: 'basic',
       title: 'Email AI Assistant - Error',
@@ -171,7 +211,7 @@ messenger.menus.create({
   title: "Process with AI Assistant",
   contexts: ["folder_pane"],
   onclick: async (info) => {
-    console.log("Context menu clicked for folder:", info.selectedFolder);
+    log("Context menu clicked for folder:", info.selectedFolder);
     await processFolderRetroactively(info.selectedFolder);
   }
 });
@@ -183,5 +223,4 @@ messenger.runtime.onMessage.addListener((message, sender) => {
   }
 });
 
-// Initialize
-ensureTagsExist();
+// Initialization moved to async startup block above

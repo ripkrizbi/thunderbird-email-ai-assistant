@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- General Settings Elements ---
   const providerSelect = document.getElementById('provider');
   const enableNewMailProcessing = document.getElementById('enable-new-mail-processing');
+  const enableDebugLogging = document.getElementById('enable-debug-logging');
   const generalForm = document.getElementById('general-options-form');
   const generalStatusMessage = document.getElementById('general-status-message');
   const statusMessage = document.getElementById('general-status-message');
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = await messenger.storage.local.get(DEFAULTS);
 
     enableNewMailProcessing.checked = settings.enableNewMailProcessing;
+    if (enableDebugLogging) enableDebugLogging.checked = !!settings.debugMode;
     providerSelect.value = settings.provider;
     if(document.getElementById('ollama-api-url'))
       document.getElementById('ollama-api-url').value = settings.ollamaApiUrl;
@@ -67,6 +69,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settingsToSave = { 
       provider,
       enableNewMailProcessing: enableNewMailProcessing.checked
+    };
+    if (enableDebugLogging) settingsToSave.debugMode = enableDebugLogging.checked;
     };
     let permissionGranted = true;
     let permissionOrigin = '';

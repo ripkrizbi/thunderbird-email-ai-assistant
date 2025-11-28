@@ -70,7 +70,8 @@ export const DEFAULTS = {
   mistralApiKey: '',
   deepseekApiKey: '',
   customTags: DEFAULT_CUSTOM_TAGS,
-  enableNewMailProcessing: false
+  enableNewMailProcessing: false,
+  debugMode: false
 };
 
 export const PROMPT_BASE = [
