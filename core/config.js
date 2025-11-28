@@ -71,7 +71,8 @@ export const DEFAULTS = {
   deepseekApiKey: '',
   customTags: DEFAULT_CUSTOM_TAGS,
   enableNewMailProcessing: false,
-  debugMode: false
+  debugMode: false,
+  forceReprocessInMessageMode: true
 };
 
 export const PROMPT_BASE = [

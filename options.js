@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const providerSelect = document.getElementById('provider');
   const enableNewMailProcessing = document.getElementById('enable-new-mail-processing');
   const enableDebugLogging = document.getElementById('enable-debug-logging');
+  const forceReprocessInMessageMode = document.getElementById('force-reprocess-in-message-mode');
   const generalForm = document.getElementById('general-options-form');
   const generalStatusMessage = document.getElementById('general-status-message');
   const statusMessage = document.getElementById('general-status-message');
@@ -44,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     enableNewMailProcessing.checked = settings.enableNewMailProcessing;
     if (enableDebugLogging) enableDebugLogging.checked = !!settings.debugMode;
+    if (forceReprocessInMessageMode) forceReprocessInMessageMode.checked = !!settings.forceReprocessInMessageMode;
     providerSelect.value = settings.provider;
     if(document.getElementById('ollama-api-url'))
       document.getElementById('ollama-api-url').value = settings.ollamaApiUrl;
@@ -71,6 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       enableNewMailProcessing: enableNewMailProcessing.checked
     };
     if (enableDebugLogging) settingsToSave.debugMode = enableDebugLogging.checked;
+    if (forceReprocessInMessageMode) settingsToSave.forceReprocessInMessageMode = forceReprocessInMessageMode.checked;
     let permissionGranted = true;
     let permissionOrigin = '';
 

@@ -31,6 +31,13 @@
           </label>
           <p class="help-text">When enabled, additional debug logs will be printed to the console. Useful for troubleshooting.</p>
         </div>
+        <div class="form-group">
+          <label for="force-reprocess-in-message-mode">
+            <input type="checkbox" id="force-reprocess-in-message-mode" name="force-reprocess-in-message-mode">
+            Force re-process messages in message mode
+          </label>
+          <p class="help-text">When enabled, processing single/multiple selected messages will re-analyze them even if they were already processed. When disabled, already-processed messages are skipped.</p>
+        </div>
         <hr>
         <div class="form-group">
           <label for="provider">LLM Provider:</label>
