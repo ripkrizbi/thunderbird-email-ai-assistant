@@ -7,6 +7,9 @@ import { setDebug, log, info, warn, error } from './core/debug.js';
 // Global flag for cancelling retroactive processing
 let processingCancelled = false;
 
+// Global flag to track if LLM API is unavailable
+let apiUnavailable = false;
+
 // Initialization: read debug setting and run startup tasks
 (async () => {
   try {
@@ -21,6 +24,12 @@ let processingCancelled = false;
 })();
 
 async function analyzeEmail(structuredData) {
+  // If API is marked unavailable, skip processing to avoid retries
+  if (apiUnavailable) {
+    log("API marked as unavailable, skipping analysis");
+    return null;
+  }
+  
   const settings = await messenger.storage.local.get(DEFAULTS);
   log("Spam-Filter Extension: analyzeEmail called");
   log("Provider:", settings.provider);
@@ -31,9 +40,20 @@ async function analyzeEmail(structuredData) {
     // Pass both general settings and custom tags to the engine
     log(`Using ${settings.provider} engine`);
     log("Calling analysis engine...");
-    const result = await engine(settings, structuredData, settings.customTags);
-    log("Analysis engine returned:", result);
-    return result;
+    try {
+      const result = await engine(settings, structuredData, settings.customTags);
+      log("Analysis engine returned:", result);
+      return result;
+    } catch (err) {
+      // If it's a network error or timeout, mark API as unavailable
+      if (err.message.includes('API timeout') || err.message.includes('Failed to fetch') || err.name === 'AbortError') {
+        error("LLM API unavailable or unreachable - stopping processing");
+        apiUnavailable = true;
+        // Reset after a short delay to allow recovery
+        setTimeout(() => { apiUnavailable = false; }, 60000);
+      }
+      throw err;
+    }
   } else {
     error(`No analysis engine found for provider: ${settings.provider}`);
     return null;
@@ -173,6 +193,18 @@ async function processMessages(messages) {
         return;
       }
       
+      // Check if API became unavailable
+      if (apiUnavailable) {
+        log("LLM API became unavailable. Stopping processing at message", processedCount, 'of', messages.length);
+        await messenger.notifications.clear('processing-cancel');
+        await messenger.notifications.create('processing-error', {
+          type: 'basic',
+          title: 'Email AI Assistant - API Unavailable',
+          message: `LLM API is unavailable or unreachable. Stopped after ${processedCount} messages. Will retry in 1 minute.`
+        });
+        return;
+      }
+      
       const result = await processMessage(message, forceReprocess);
       processedCount++;
       
@@ -257,6 +289,18 @@ async function processFolderRetroactively(folder) {
       if (processingCancelled) {
         log("Processing cancelled. Stopped at message", processedCount, 'of', allMessages.length);
         await messenger.notifications.clear('processing-cancel');
+        return;
+      }
+      
+      // Check if API became unavailable
+      if (apiUnavailable) {
+        log("LLM API became unavailable. Stopping folder processing at message", processedCount, 'of', allMessages.length);
+        await messenger.notifications.clear('processing-cancel');
+        await messenger.notifications.create('processing-error', {
+          type: 'basic',
+          title: 'Email AI Assistant - API Unavailable',
+          message: `LLM API is unavailable or unreachable. Stopped after ${processedCount} of ${allMessages.length} messages. Will retry in 1 minute.`
+        });
         return;
       }
       

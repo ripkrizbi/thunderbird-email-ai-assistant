@@ -64,6 +64,7 @@ export const DEFAULTS = {
   provider: 'ollama',
   ollamaApiUrl: 'http://localhost:11434/api/generate',
   ollamaModel: 'gemma3:27b',
+  ollamaApiTimeout: 120,
   openaiApiKey: '',
   geminiApiKey: '',
   claudeApiKey: '',

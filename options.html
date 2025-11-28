@@ -60,6 +60,11 @@
             <input type="text" id="ollama-model" name="ollama-model">
             <p class="help-text">To add a new model, run <code>ollama pull &lt;model_name&gt;</code>.</p>
           </div>
+          <div class="form-group">
+            <label for="ollama-api-timeout">API Timeout (seconds):</label>
+            <input type="number" id="ollama-api-timeout" name="ollama-api-timeout" min="10" max="600" value="120">
+            <p class="help-text">Maximum time to wait for Ollama API response. Increase this if your model is slow or you have a network latency issue.</p>
+          </div>
           <hr>
           <div class="help-section">
             <h2>Ollama Setup</h2>

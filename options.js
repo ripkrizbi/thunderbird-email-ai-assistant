@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('ollama-api-url').value = settings.ollamaApiUrl;
     if(document.getElementById('ollama-model'))
       document.getElementById('ollama-model').value = settings.ollamaModel;
+    if(document.getElementById('ollama-api-timeout'))
+      document.getElementById('ollama-api-timeout').value = settings.ollamaApiTimeout;
     if(document.getElementById('openai-api-key'))
       document.getElementById('openai-api-key').value = settings.openaiApiKey;
     if(document.getElementById('gemini-api-key'))
@@ -82,6 +84,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       case 'ollama':
         settingsToSave.ollamaApiUrl = document.getElementById('ollama-api-url').value.trim();
         settingsToSave.ollamaModel = document.getElementById('ollama-model').value.trim();
+        const timeoutVal = parseInt(document.getElementById('ollama-api-timeout').value, 10);
+        settingsToSave.ollamaApiTimeout = Math.max(10, Math.min(600, timeoutVal || 120)); // Clamp between 10 and 600
         permissionOrigin = new URL(settingsToSave.ollamaApiUrl).origin + "/*";
         break;
       case 'openai':
