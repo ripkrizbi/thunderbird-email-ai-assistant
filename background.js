@@ -110,9 +110,9 @@ async function processMessage(message, forceReprocess = false) {
     log("Current tags before processing:", Array.from(tagSet));
     
     // Handle hardcoded tags
-    if (analysis.is_scam || analysis.spf_pass === false || analysis.dkim_pass === false) tagSet.add(HARDCODED_TAGS.is_scam.key);
-    if (analysis.spf_pass === false) tagSet.add(HARDCODED_TAGS.spf_fail.key);
-    if (analysis.dkim_pass === false) tagSet.add(HARDCODED_TAGS.dkim_fail.key);
+    if (analysis.is_scam || analysis.spf_pass === false || analysis.dkim_pass === false) tagSet.add(TAG_KEY_PREFIX + HARDCODED_TAGS.is_scam.key);
+    if (analysis.spf_pass === false) tagSet.add(TAG_KEY_PREFIX + HARDCODED_TAGS.spf_fail.key);
+    if (analysis.dkim_pass === false) tagSet.add(TAG_KEY_PREFIX + HARDCODED_TAGS.dkim_fail.key);
 
     // Handle dynamic custom tags
     for (const tag of customTags) {
