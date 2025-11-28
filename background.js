@@ -126,13 +126,13 @@ messenger.messages.onNewMailReceived.addListener(async (folder, messages) => {
 
 // Retroactive folder processing
 async function processFolderRetroactively(folder) {
-  console.log("Spam-Filter Extension: Starting retroactive processing for folder:", folder);
-  
+  log("Spam-Filter Extension: Starting retroactive processing for folder:", folder);
+
   try {
     // folder is already the folder object from the context menu or message
     const folderName = folder.name || 'Unknown Folder';
-    console.log("Processing folder:", folderName);
-    console.log("Folder object:", JSON.stringify(folder, null, 2));
+    log("Processing folder:", folderName);
+    log("Folder object:", JSON.stringify(folder, null, 2));
     
     // Get all messages in the folder
     log("Fetching messages from folder...");
@@ -157,12 +157,7 @@ async function processFolderRetroactively(folder) {
     let successCount = 0;
     let skippedCount = 0;
     
-    // Show notification about starting processing
-    await messenger.notifications.create('processing-start', {
-      type: 'basic',
-      title: 'Email AI Assistant',
-      message: `Starting to process ${allMessages.length} messages in "${folderName}"...`
-    });
+    // (notifications for start/progress/completion removed - use console debug instead)
     
     for (const message of allMessages) {
       const result = await processMessage(message);
@@ -178,22 +173,12 @@ async function processFolderRetroactively(folder) {
       if (processedCount % 10 === 0 || processedCount === allMessages.length) {
         const progressMsg = `Processing: ${processedCount}/${allMessages.length} messages (${skippedCount} already processed)`;
         log(progressMsg);
-        await messenger.notifications.create('processing-progress', {
-          type: 'basic',
-          title: 'Email AI Assistant',
-          message: progressMsg
-        });
       }
     }
     
     // Show completion notification
     const completionMsg = `Completed! Processed ${successCount}/${allMessages.length} messages (${skippedCount} already processed) in "${folderName}"`;
     log(completionMsg);
-    await messenger.notifications.create('processing-complete', {
-      type: 'basic',
-      title: 'Email AI Assistant',
-      message: completionMsg
-    });
     
   } catch (error) {
     error("Error processing folder:", error);
