@@ -92,16 +92,16 @@ messenger.messages.onNewMailReceived.addListener(async (folder, messages) => {
 });
 
 // Retroactive folder processing
-async function processFolderRetroactively(folderId) {
-  console.log("Spam-Filter Extension: Starting retroactive processing for folder ID:", folderId);
+async function processFolderRetroactively(folder) {
+  console.log("Spam-Filter Extension: Starting retroactive processing for folder:", folder);
   
   try {
-    // Get the folder details
-    const folder = await messenger.folders.getFolderInfoFromPath(folderId);
-    console.log("Processing folder:", folder.name);
+    // folder is already the folder object from the context menu or message
+    const folderName = folder.name || 'Unknown Folder';
+    console.log("Processing folder:", folderName);
     
     // Get all messages in the folder
-    const page = await messenger.messages.list(folderId);
+    const page = await messenger.messages.list(folder);
     const allMessages = [...page.messages];
     
     // If there are more messages, we need to handle pagination
@@ -121,7 +121,7 @@ async function processFolderRetroactively(folderId) {
     await messenger.notifications.create('processing-start', {
       type: 'basic',
       title: 'Email AI Assistant',
-      message: `Starting to process ${allMessages.length} messages in "${folder.name}"...`
+      message: `Starting to process ${allMessages.length} messages in "${folderName}"...`
     });
     
     for (const message of allMessages) {
@@ -147,7 +147,7 @@ async function processFolderRetroactively(folderId) {
     }
     
     // Show completion notification
-    const completionMsg = `Completed! Processed ${successCount}/${allMessages.length} messages (${skippedCount} already processed) in "${folder.name}"`;
+    const completionMsg = `Completed! Processed ${successCount}/${allMessages.length} messages (${skippedCount} already processed) in "${folderName}"`;
     console.log(completionMsg);
     await messenger.notifications.create('processing-complete', {
       type: 'basic',
