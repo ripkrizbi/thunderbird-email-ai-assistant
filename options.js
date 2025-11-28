@@ -71,7 +71,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       enableNewMailProcessing: enableNewMailProcessing.checked
     };
     if (enableDebugLogging) settingsToSave.debugMode = enableDebugLogging.checked;
-    };
     let permissionGranted = true;
     let permissionOrigin = '';
 

@@ -4,6 +4,9 @@ import { PROVIDER_ENGINES } from './providers';
 import {ensureTagsExist} from "./core/tags";
 import { setDebug, log, info, warn, error } from './core/debug.js';
 
+// Global flag for cancelling retroactive processing
+let processingCancelled = false;
+
 // Initialization: read debug setting and run startup tasks
 (async () => {
   try {
@@ -58,8 +61,13 @@ async function processMessage(message) {
 
     const fullMessage = await messenger.messages.getFull(message.id);
     log("Full message retrieved, parsing parts...");
-    const { body, attachments } = findEmailParts(fullMessage.parts);
-    log("Email parts found - Body length:", body.length, "Attachments:", attachments.length);
+    const { body, attachments } = findEmailParts(fullMessage.parts || []);
+    log("Email parts found - Body length:", body ? body.length : 0, "Attachments:", attachments.length);
+    
+    if (!body) {
+      log("Message has no body content, skipping ID:", message.id);
+      return 'skipped';
+    }
     
     const structuredData = {
         headers: fullMessage.headers,
@@ -100,9 +108,9 @@ async function processMessage(message) {
     await messenger.messages.update(message.id, { tags: tagsArray });
     log("Message updated successfully");
     return true;
-  } catch (error) {
-    error("Error processing message ID:", message.id, error);
-    error("Error stack:", error.stack);
+  } catch (err) {
+    error("Error processing message ID:", message.id, err);
+    error("Error stack:", err.stack);
     return false;
   }
 }
@@ -157,9 +165,30 @@ async function processFolderRetroactively(folder) {
     let successCount = 0;
     let skippedCount = 0;
     
+    // Show a cancel notification
+    log("About to create processing cancel notification...");
+    try {
+      await messenger.notifications.create('processing-cancel', {
+        type: 'basic',
+        title: 'Email AI Assistant - Processing',
+        message: `Processing ${allMessages.length} messages in "${folderName}". Click to cancel.`,
+        isClickable: true
+      });
+      log("Processing cancel notification created successfully");
+    } catch (notifErr) {
+      error("Failed to create notification:", notifErr);
+    }
+    
     // (notifications for start/progress/completion removed - use console debug instead)
     
     for (const message of allMessages) {
+      // Check if processing was cancelled
+      if (processingCancelled) {
+        log("Processing cancelled. Stopped at message", processedCount, 'of', allMessages.length);
+        await messenger.notifications.clear('processing-cancel');
+        return;
+      }
+      
       const result = await processMessage(message);
       processedCount++;
       
@@ -176,16 +205,17 @@ async function processFolderRetroactively(folder) {
       }
     }
     
-    // Show completion notification
+    // Clear the cancel notification and show completion
+    await messenger.notifications.clear('processing-cancel');
     const completionMsg = `Completed! Processed ${successCount}/${allMessages.length} messages (${skippedCount} already processed) in "${folderName}"`;
     log(completionMsg);
     
-  } catch (error) {
-    error("Error processing folder:", error);
+  } catch (err) {
+    error("Error processing folder:", err);
     await messenger.notifications.create('processing-error', {
       type: 'basic',
       title: 'Email AI Assistant - Error',
-      message: `Error processing folder: ${error.message}`
+      message: `Error processing folder: ${err.message}`
     });
   }
 }
@@ -196,15 +226,33 @@ messenger.menus.create({
   title: "Process with AI Assistant",
   contexts: ["folder_pane"],
   onclick: async (info) => {
-    log("Context menu clicked for folder:", info.selectedFolder);
-    await processFolderRetroactively(info.selectedFolder);
+    log("★ Context menu clicked for folder:", info.selectedFolder?.name || 'Unknown');
+    log("★ Folder object:", info.selectedFolder);
+    processingCancelled = false; // Reset cancel flag when starting new processing
+    log("★ About to call processFolderRetroactively");
+    try {
+      await processFolderRetroactively(info.selectedFolder);
+    } catch (e) {
+      error("★ Error in context menu handler:", e);
+    }
+  }
+});
+
+// Handle cancel button from notification
+messenger.notifications.onClicked.addListener((notificationId) => {
+  if (notificationId === 'processing-cancel') {
+    processingCancelled = true;
+    log("Processing cancelled by user");
   }
 });
 
 // Listen for messages from content scripts (e.g., from progress dialog)
 messenger.runtime.onMessage.addListener((message, sender) => {
   if (message.type === 'startFolderProcessing') {
+    processingCancelled = false;
     processFolderRetroactively(message.folderId);
+  } else if (message.type === 'cancelProcessing') {
+    processingCancelled = true;
   }
 });
 
