@@ -1,43 +1,69 @@
 (function(){
   function init() {
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
+    const root      = document.getElementById('progress-root');
+    const barFill   = document.getElementById('bar-fill');
+    const headerPct = document.getElementById('header-pct');
+    const statusText = document.getElementById('status-text');
     const cancelBtn = document.getElementById('cancel-btn');
-    const closeBtn = document.getElementById('close-btn');
+    const closeBtn  = document.getElementById('close-btn');
 
-    // Listen for runtime messages from the background script
+    // state: 'processing' | 'done' | 'cancelled' | 'error'
+    let state = 'processing';
+
+    function setState(newState) {
+      state = newState;
+      root.className = '';
+      if (newState === 'done')      root.classList.add('state-done');
+      if (newState === 'error')     root.classList.add('state-error');
+      if (newState !== 'processing') {
+        cancelBtn.style.display = 'none';
+        closeBtn.disabled = false;
+      }
+    }
+
+    function setProgress(processed, total, tagged) {
+      const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+      barFill.style.width = pct + '%';
+      headerPct.textContent = pct + '%';
+      statusText.textContent = `Processing ${processed} / ${total}  \u2022  ${tagged} tagged`;
+    }
+
+    function setDone(success, total) {
+      barFill.style.width = '100%';
+      headerPct.textContent = '100%';
+      statusText.textContent = `Done \u2014 ${success} tagged out of ${total}`;
+      setState('done');
+    }
+
+    function setCancelled(processed, total) {
+      statusText.textContent = `Cancelled at ${processed} / ${total}`;
+      setState('cancelled');
+    }
+
+    // Listen for runtime messages from background
     if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.onMessage) {
       browser.runtime.onMessage.addListener((msg) => {
-        if (!msg) return;
+        if (!msg || state === 'done' || state === 'cancelled') return;
         if (msg.type === 'progressUpdate') {
-          const { processed, total, tagged } = msg;
-          const percent = total ? Math.round((processed/total)*100) : 0;
-          if (progressBar) {
-            progressBar.max = 100;
-            progressBar.value = percent;
-          }
-          if (progressText) progressText.textContent = `${processed} / ${total} (${tagged} tagged)`;
+          setProgress(msg.processed, msg.total, msg.tagged);
         } else if (msg.type === 'progressComplete') {
-          if (progressText) progressText.textContent = `Completed: ${msg.success}/${msg.total} tagged`;
+          setDone(msg.success, msg.total);
+        } else if (msg.type === 'progressCancelled') {
+          setCancelled(msg.processed || 0, msg.total || 0);
         }
       });
     }
 
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => {
-        if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
-          browser.runtime.sendMessage({ type: 'cancelFromUI' });
-        }
-        // close the UI immediately
-        window.close();
-      });
-    }
+    cancelBtn.addEventListener('click', () => {
+      if (state !== 'processing') return;
+      setState('cancelled');
+      statusText.textContent = 'Cancelling\u2026';
+      if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
+        browser.runtime.sendMessage({ type: 'cancelFromUI' });
+      }
+    });
 
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        window.close();
-      });
-    }
+    closeBtn.addEventListener('click', () => window.close());
   }
 
   if (document.readyState === 'loading') {

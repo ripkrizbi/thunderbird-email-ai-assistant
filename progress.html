@@ -2,19 +2,25 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Email Assistant - Progress</title>
+  <title>Email Assistant – Progress</title>
   <link rel="stylesheet" href="progress.css">
 </head>
 <body>
   <div id="progress-root">
-    <div id="title">Email AI Assistant</div>
-    <div id="progress-container">
-      <progress id="progress-bar" value="0" max="100"></progress>
-      <div id="progress-text">0 / 0</div>
+    <div id="header">
+      <span id="header-icon">✉</span>
+      <span id="header-title">Email AI Assistant</span>
+      <span id="header-pct">0%</span>
     </div>
-    <div id="controls">
-      <button id="cancel-btn">Cancel</button>
-      <button id="close-btn">Close</button>
+    <div id="bar-track">
+      <div id="bar-fill"></div>
+    </div>
+    <div id="footer">
+      <span id="status-text">Starting…</span>
+      <div id="controls">
+        <button id="cancel-btn">Cancel</button>
+        <button id="close-btn" disabled>Close</button>
+      </div>
     </div>
   </div>
   <script src="progress.js"></script>

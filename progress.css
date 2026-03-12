@@ -1,8 +1,133 @@
-#progress-root { font-family: Arial, sans-serif; width: 360px; padding: 12px; background: #fff; border: 1px solid #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-#title { font-weight: bold; margin-bottom: 8px; }
-#progress-container { display: flex; align-items: center; gap: 8px; }
-#progress-bar { width: 220px; height: 14px; }
-#progress-text { min-width: 80px; font-size: 12px; }
-#controls { margin-top: 8px; display:flex; gap:8px; justify-content:flex-end; }
-button { padding: 6px 10px; font-size: 12px; }
-body { margin:0; }
+/* ---------- tokens ---------- */
+:root {
+  --bg:        #ffffff;
+  --bg-bar:    #e0e0e0;
+  --fill:      #0a84ff;
+  --fill-done: #30d158;
+  --fill-err:  #ff453a;
+  --text:      #1c1c1e;
+  --text-muted:#6e6e73;
+  --border:    rgba(0,0,0,0.12);
+  --shadow:    0 4px 20px rgba(0,0,0,0.18);
+  --radius:    10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        #2a2a2e;
+    --bg-bar:    #3a3a3e;
+    --text:      #f9f9fa;
+    --text-muted:#98989d;
+    --border:    rgba(255,255,255,0.10);
+    --shadow:    0 4px 20px rgba(0,0,0,0.55);
+  }
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+
+/* ---------- shell ---------- */
+#progress-root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- header ---------- */
+#header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#header-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+#header-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+#header-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fill);
+  min-width: 32px;
+  text-align: right;
+  transition: color 0.3s;
+}
+
+/* ---------- bar ---------- */
+#bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-bar);
+  border-radius: 999px;
+  overflow: hidden;
+}
+#bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--fill);
+  border-radius: 999px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+/* ---------- footer ---------- */
+#footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#status-text {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#controls {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ---------- buttons ---------- */
+button {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--bg-bar);
+  color: var(--text);
+  transition: opacity 0.15s;
+}
+button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+#cancel-btn {
+  background: transparent;
+  color: var(--fill-err);
+  border-color: var(--fill-err);
+}
+#cancel-btn:hover:not(:disabled) { background: var(--fill-err); color: #fff; }
+
+/* ---------- state modifiers ---------- */
+.state-done  #bar-fill   { background: var(--fill-done); }
+.state-done  #header-pct { color: var(--fill-done); }
+.state-error #bar-fill   { background: var(--fill-err); }
+.state-error #header-pct { color: var(--fill-err); }

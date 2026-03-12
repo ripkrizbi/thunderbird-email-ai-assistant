@@ -205,10 +205,11 @@ async function processMessages(messages) {
     if (!progressSidebarOpen) {
       try {
         const mainWin = await messenger.windows.getCurrent();
-        // Create a normally-sized popup positioned near bottom-right of the main window
+        // Create a compact popup positioned near bottom-right of the main window
+        // Height/width include OS chrome (title bar ~30px, borders ~4px) so add padding
         const popupWidth = 360;
-        const popupHeight = 120;
-        const margin = 12;
+        const popupHeight = 140;
+        const margin = 16;
         const left = (mainWin.left || 0) + Math.max(0, ((mainWin.width || 800) - popupWidth - margin));
         const top = (mainWin.top || 0) + Math.max(0, ((mainWin.height || 600) - popupHeight - margin));
         const win = await messenger.windows.create({ url: messenger.runtime.getURL('progress.html'), type: 'popup', left, top, width: popupWidth, height: popupHeight });
@@ -218,6 +219,12 @@ async function processMessages(messages) {
         progressWindowId = null;
       }
     }
+
+    // Give the popup/sidebar a moment to load and register its message listener
+    await new Promise(r => setTimeout(r, 500));
+
+    // Send initial progress so the popup shows totals immediately
+    try { messenger.runtime.sendMessage({ type: 'progressUpdate', processed: 0, total: messages.length, tagged: 0 }); } catch (e) {}
     
     // Show a cancel notification
     try {
@@ -237,6 +244,7 @@ async function processMessages(messages) {
       if (processingCancelled) {
         log("Processing cancelled. Stopped at message", processedCount, 'of', messages.length);
         await messenger.notifications.clear('processing-cancel');
+        try { messenger.runtime.sendMessage({ type: 'progressCancelled', processed: processedCount, total: messages.length }); } catch (e) {}
         // close any UI
         if (progressSidebarOpen) {
           try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
@@ -279,15 +287,10 @@ async function processMessages(messages) {
         skippedCount++;
       }
       
-      // Send progress update
-      if (processedCount % 5 === 0 || processedCount === messages.length) {
-        const progressMsg = `Processing: ${processedCount}/${messages.length} messages (${skippedCount} already processed)`;
-        log(progressMsg);
-        // Send progress to progress window if open
-        try {
-          messenger.runtime.sendMessage({ type: 'progressUpdate', processed: processedCount, total: messages.length, tagged: successCount });
-        } catch (e) {}
-      }
+      // Send progress update after every message
+      const progressMsg = `Processing: ${processedCount}/${messages.length} messages (${skippedCount} already processed)`;
+      log(progressMsg);
+      try { messenger.runtime.sendMessage({ type: 'progressUpdate', processed: processedCount, total: messages.length, tagged: successCount }); } catch (e) {}
     }
     
     // Clear the cancel notification and show completion
@@ -361,10 +364,11 @@ async function processFolderRetroactively(folder) {
     if (!progressSidebarOpen) {
       try {
         const mainWin = await messenger.windows.getCurrent();
-        // Create a normally-sized popup positioned near bottom-right of the main window
+        // Create a compact popup positioned near bottom-right of the main window
+        // Height/width include OS chrome (title bar ~30px, borders ~4px) so add padding
         const popupWidth = 360;
-        const popupHeight = 120;
-        const margin = 12;
+        const popupHeight = 140;
+        const margin = 16;
         const left = (mainWin.left || 0) + Math.max(0, ((mainWin.width || 800) - popupWidth - margin));
         const top = (mainWin.top || 0) + Math.max(0, ((mainWin.height || 600) - popupHeight - margin));
         const win = await messenger.windows.create({ url: messenger.runtime.getURL('progress.html'), type: 'popup', left, top, width: popupWidth, height: popupHeight });
@@ -374,6 +378,12 @@ async function processFolderRetroactively(folder) {
         progressWindowId = null;
       }
     }
+
+    // Give the popup/sidebar a moment to load and register its message listener
+    await new Promise(r => setTimeout(r, 500));
+
+    // Send initial progress so the popup shows totals immediately
+    try { messenger.runtime.sendMessage({ type: 'progressUpdate', processed: 0, total: allMessages.length, tagged: 0 }); } catch (e) {}
 
     let processedCount = 0;
     let successCount = 0;
@@ -399,6 +409,7 @@ async function processFolderRetroactively(folder) {
       if (processingCancelled) {
         log("Processing cancelled. Stopped at message", processedCount, 'of', allMessages.length);
         await messenger.notifications.clear('processing-cancel');
+        try { messenger.runtime.sendMessage({ type: 'progressCancelled', processed: processedCount, total: allMessages.length }); } catch (e) {}
         // close any UI
         if (progressSidebarOpen) {
           try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
@@ -441,12 +452,10 @@ async function processFolderRetroactively(folder) {
         skippedCount++;
       }
       
-      // Send progress update every 10 messages
-      if (processedCount % 10 === 0 || processedCount === allMessages.length) {
-        const progressMsg = `Processing: ${processedCount}/${allMessages.length} messages (${skippedCount} already processed)`;
-        log(progressMsg);
-        try { messenger.runtime.sendMessage({ type: 'progressUpdate', processed: processedCount, total: allMessages.length, tagged: successCount }); } catch (e) {}
-      }
+      // Send progress update after every message
+      const progressMsg = `Processing: ${processedCount}/${allMessages.length} messages (${skippedCount} already processed)`;
+      log(progressMsg);
+      try { messenger.runtime.sendMessage({ type: 'progressUpdate', processed: processedCount, total: allMessages.length, tagged: successCount }); } catch (e) {}
     }
     
     // Clear the cancel notification and show completion
