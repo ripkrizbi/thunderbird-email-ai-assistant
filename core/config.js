@@ -103,6 +103,6 @@ export const PROMPT_BASE = [
   '- is_scam: (boolean) check if the mail sounds like a scam'
 ].join('\n');
 
-export const CONTEXT_TOKEN_LIMIT = 128000;
+export const CONTEXT_TOKEN_LIMIT = 4000;   // enough for classification; keeps response times fast
 export const CHARS_PER_TOKEN_ESTIMATE = 4;
-export const CONTEXT_CHAR_LIMIT = CONTEXT_TOKEN_LIMIT * CHARS_PER_TOKEN_ESTIMATE;
+export const CONTEXT_CHAR_LIMIT = CONTEXT_TOKEN_LIMIT * CHARS_PER_TOKEN_ESTIMATE; // 16,000 chars total

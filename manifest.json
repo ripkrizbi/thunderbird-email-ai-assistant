@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Email Assistant",
-  "version": "1.0.6",
+  "version": "1.0.8",
   "description": "Automatically tags messages base on AI rules",
   "permissions": [
     "messagesRead",
@@ -12,11 +12,11 @@
     "notifications",
     "messagesTags",
     "messagesTagsList",
-    "http://localhost:11434/api/generate"
+    "http://localhost:11434/*",
+    "http://193.198.194.108:11434/*"
   ],
   "optional_permissions": [
-    "http://*/*",
-    "https://*/*"
+    "windows"
   ],
   "background": {
     "page": "background.html"
@@ -29,5 +29,13 @@
     "gecko": {
       "id": "mail-assistant-0.1@entestat.com"
     }
-  }
+  },
+  "sidebar_action": {
+    "default_panel": "progress.html"
+  },
+  "web_accessible_resources": [
+    "progress.html",
+    "progress.js",
+    "progress.css"
+  ]
 }

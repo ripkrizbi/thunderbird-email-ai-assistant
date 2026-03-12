@@ -110,10 +110,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
     }
 
-    // Request permission if an API key or URL is set
-    if (Object.values(settingsToSave).some(val => val)) {
+    // Request permission only if needed and not already granted
+    if (permissionOrigin && Object.values(settingsToSave).some(val => val)) {
       try {
-        permissionGranted = await messenger.permissions.request({ origins: [permissionOrigin] });
+        const alreadyGranted = await messenger.permissions.contains({ origins: [permissionOrigin] });
+        if (alreadyGranted) {
+          permissionGranted = true;
+        } else {
+          permissionGranted = await messenger.permissions.request({ origins: [permissionOrigin] });
+        }
       } catch (e) {
         console.error("Error requesting permission:", e);
         statusMessage.textContent = 'Error with permission request.';

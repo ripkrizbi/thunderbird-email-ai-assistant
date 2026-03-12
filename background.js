@@ -9,6 +9,10 @@ let processingCancelled = false;
 
 // Global flag to track if LLM API is unavailable
 let apiUnavailable = false;
+// Progress window id
+let progressWindowId = null;
+// Progress sidebar open flag
+let progressSidebarOpen = false;
 
 // Initialization: read debug setting and run startup tasks
 (async () => {
@@ -45,7 +49,19 @@ async function analyzeEmail(structuredData) {
       log("Analysis engine returned:", result);
       return result;
     } catch (err) {
-      // If it's a network error or timeout, mark API as unavailable
+      // 405 = wrong endpoint URL in settings - config error, not a transient failure
+      if (err.message.includes('405')) {
+        error("LLM API configuration error (405 Method Not Allowed) - check Ollama URL in settings");
+        try {
+          await messenger.notifications.create('api-config-error', {
+            type: 'basic',
+            title: 'Email AI Assistant – Configuration Error',
+            message: `Ollama returned 405 Method Not Allowed. Check that the Ollama URL in settings ends with /api/generate.`
+          });
+        } catch (_) {}
+        throw err;
+      }
+      // Network error or timeout → mark API as unavailable temporarily
       if (err.message.includes('API timeout') || err.message.includes('Failed to fetch') || err.name === 'AbortError') {
         error("LLM API unavailable or unreachable - stopping processing");
         apiUnavailable = true;
@@ -171,6 +187,37 @@ async function processMessages(messages) {
     let processedCount = 0;
     let successCount = 0;
     let skippedCount = 0;
+    // Try opening a sidebar; fall back to popup if sidebarAction is not available
+    progressSidebarOpen = false;
+    try {
+      if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.setPanel) {
+        await browser.sidebarAction.setPanel({ panel: messenger.runtime.getURL('progress.html') });
+      }
+      if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.open) {
+        await browser.sidebarAction.open();
+        progressSidebarOpen = true;
+      }
+    } catch (e) {
+      log('Sidebar open failed, will try popup fallback', e);
+      progressSidebarOpen = false;
+    }
+
+    if (!progressSidebarOpen) {
+      try {
+        const mainWin = await messenger.windows.getCurrent();
+        // Create a normally-sized popup positioned near bottom-right of the main window
+        const popupWidth = 360;
+        const popupHeight = 120;
+        const margin = 12;
+        const left = (mainWin.left || 0) + Math.max(0, ((mainWin.width || 800) - popupWidth - margin));
+        const top = (mainWin.top || 0) + Math.max(0, ((mainWin.height || 600) - popupHeight - margin));
+        const win = await messenger.windows.create({ url: messenger.runtime.getURL('progress.html'), type: 'popup', left, top, width: popupWidth, height: popupHeight });
+        progressWindowId = win.id;
+      } catch (e) {
+        log('Could not open progress window, falling back to notifications', e);
+        progressWindowId = null;
+      }
+    }
     
     // Show a cancel notification
     try {
@@ -190,6 +237,15 @@ async function processMessages(messages) {
       if (processingCancelled) {
         log("Processing cancelled. Stopped at message", processedCount, 'of', messages.length);
         await messenger.notifications.clear('processing-cancel');
+        // close any UI
+        if (progressSidebarOpen) {
+          try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
+          progressSidebarOpen = false;
+        }
+        if (progressWindowId) {
+          try { await messenger.windows.remove(progressWindowId); } catch (e) {}
+          progressWindowId = null;
+        }
         return;
       }
       
@@ -197,6 +253,15 @@ async function processMessages(messages) {
       if (apiUnavailable) {
         log("LLM API became unavailable. Stopping processing at message", processedCount, 'of', messages.length);
         await messenger.notifications.clear('processing-cancel');
+        // close any UI
+        if (progressSidebarOpen) {
+          try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
+          progressSidebarOpen = false;
+        }
+        if (progressWindowId) {
+          try { await messenger.windows.remove(progressWindowId); } catch (e) {}
+          progressWindowId = null;
+        }
         await messenger.notifications.create('processing-error', {
           type: 'basic',
           title: 'Email AI Assistant - API Unavailable',
@@ -218,6 +283,10 @@ async function processMessages(messages) {
       if (processedCount % 5 === 0 || processedCount === messages.length) {
         const progressMsg = `Processing: ${processedCount}/${messages.length} messages (${skippedCount} already processed)`;
         log(progressMsg);
+        // Send progress to progress window if open
+        try {
+          messenger.runtime.sendMessage({ type: 'progressUpdate', processed: processedCount, total: messages.length, tagged: successCount });
+        } catch (e) {}
       }
     }
     
@@ -225,6 +294,15 @@ async function processMessages(messages) {
     await messenger.notifications.clear('processing-cancel');
     const completionMsg = `Completed! Processed ${successCount}/${messages.length} messages (${skippedCount} already processed)`;
     log(completionMsg);
+    try { messenger.runtime.sendMessage({ type: 'progressComplete', success: successCount, total: messages.length }); } catch (e) {}
+    if (progressSidebarOpen) {
+      try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
+      progressSidebarOpen = false;
+    }
+    if (progressWindowId) {
+      try { await messenger.windows.remove(progressWindowId); } catch (e) {}
+      progressWindowId = null;
+    }
     
   } catch (err) {
     error("Error processing messages:", err);
@@ -265,6 +343,38 @@ async function processFolderRetroactively(folder) {
     
     log(`Total messages found: ${allMessages.length}`);
     
+    // Try opening a sidebar; fall back to popup if sidebarAction is not available
+    progressSidebarOpen = false;
+    try {
+      if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.setPanel) {
+        await browser.sidebarAction.setPanel({ panel: messenger.runtime.getURL('progress.html') });
+      }
+      if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.open) {
+        await browser.sidebarAction.open();
+        progressSidebarOpen = true;
+      }
+    } catch (e) {
+      log('Sidebar open failed for folder processing, will try popup fallback', e);
+      progressSidebarOpen = false;
+    }
+
+    if (!progressSidebarOpen) {
+      try {
+        const mainWin = await messenger.windows.getCurrent();
+        // Create a normally-sized popup positioned near bottom-right of the main window
+        const popupWidth = 360;
+        const popupHeight = 120;
+        const margin = 12;
+        const left = (mainWin.left || 0) + Math.max(0, ((mainWin.width || 800) - popupWidth - margin));
+        const top = (mainWin.top || 0) + Math.max(0, ((mainWin.height || 600) - popupHeight - margin));
+        const win = await messenger.windows.create({ url: messenger.runtime.getURL('progress.html'), type: 'popup', left, top, width: popupWidth, height: popupHeight });
+        progressWindowId = win.id;
+      } catch (e) {
+        log('Could not open progress window for folder processing, falling back to notifications', e);
+        progressWindowId = null;
+      }
+    }
+
     let processedCount = 0;
     let successCount = 0;
     let skippedCount = 0;
@@ -289,6 +399,15 @@ async function processFolderRetroactively(folder) {
       if (processingCancelled) {
         log("Processing cancelled. Stopped at message", processedCount, 'of', allMessages.length);
         await messenger.notifications.clear('processing-cancel');
+        // close any UI
+        if (progressSidebarOpen) {
+          try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
+          progressSidebarOpen = false;
+        }
+        if (progressWindowId) {
+          try { await messenger.windows.remove(progressWindowId); } catch (e) {}
+          progressWindowId = null;
+        }
         return;
       }
       
@@ -296,6 +415,15 @@ async function processFolderRetroactively(folder) {
       if (apiUnavailable) {
         log("LLM API became unavailable. Stopping folder processing at message", processedCount, 'of', allMessages.length);
         await messenger.notifications.clear('processing-cancel');
+        // close any UI
+        if (progressSidebarOpen) {
+          try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
+          progressSidebarOpen = false;
+        }
+        if (progressWindowId) {
+          try { await messenger.windows.remove(progressWindowId); } catch (e) {}
+          progressWindowId = null;
+        }
         await messenger.notifications.create('processing-error', {
           type: 'basic',
           title: 'Email AI Assistant - API Unavailable',
@@ -317,6 +445,7 @@ async function processFolderRetroactively(folder) {
       if (processedCount % 10 === 0 || processedCount === allMessages.length) {
         const progressMsg = `Processing: ${processedCount}/${allMessages.length} messages (${skippedCount} already processed)`;
         log(progressMsg);
+        try { messenger.runtime.sendMessage({ type: 'progressUpdate', processed: processedCount, total: allMessages.length, tagged: successCount }); } catch (e) {}
       }
     }
     
@@ -324,6 +453,8 @@ async function processFolderRetroactively(folder) {
     await messenger.notifications.clear('processing-cancel');
     const completionMsg = `Completed! Processed ${successCount}/${allMessages.length} messages (${skippedCount} already processed) in "${folderName}"`;
     log(completionMsg);
+    try { messenger.runtime.sendMessage({ type: 'progressComplete', success: successCount, total: allMessages.length }); } catch (e) {}
+    if (progressWindowId) { try { await messenger.windows.remove(progressWindowId); } catch (e) {} progressWindowId = null; }
     
   } catch (err) {
     error("Error processing folder:", err);
@@ -380,12 +511,22 @@ messenger.notifications.onClicked.addListener((notificationId) => {
 });
 
 // Listen for messages from content scripts (e.g., from progress dialog)
-messenger.runtime.onMessage.addListener((message, sender) => {
+messenger.runtime.onMessage.addListener(async (message, sender) => {
   if (message.type === 'startFolderProcessing') {
     processingCancelled = false;
     processFolderRetroactively(message.folderId);
-  } else if (message.type === 'cancelProcessing') {
+  } else if (message.type === 'cancelProcessing' || message.type === 'cancelFromUI') {
     processingCancelled = true;
+    log('Processing cancelled from UI');
+    // close progress window if open
+    if (progressWindowId) {
+      try { messenger.windows.remove(progressWindowId); } catch (e) {}
+      progressWindowId = null;
+    }
+    if (progressSidebarOpen) {
+      try { if (typeof browser !== 'undefined' && browser.sidebarAction && browser.sidebarAction.close) await browser.sidebarAction.close(); } catch (e) {}
+      progressSidebarOpen = false;
+    }
   }
 });
 

@@ -1,0 +1,8 @@
+#progress-root { font-family: Arial, sans-serif; width: 360px; padding: 12px; background: #fff; border: 1px solid #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+#title { font-weight: bold; margin-bottom: 8px; }
+#progress-container { display: flex; align-items: center; gap: 8px; }
+#progress-bar { width: 220px; height: 14px; }
+#progress-text { min-width: 80px; font-size: 12px; }
+#controls { margin-top: 8px; display:flex; gap:8px; justify-content:flex-end; }
+button { padding: 6px 10px; font-size: 12px; }
+body { margin:0; }
